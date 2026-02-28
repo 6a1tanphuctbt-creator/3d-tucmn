@@ -1,0 +1,238 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+<meta charset="UTF-8" />
+<title>Khu mô phỏng Trung Ương Cục Miền Nam</title>
+<style>
+    body { margin: 0; overflow: hidden; background: #000; }
+</style>
+</head>
+<body>
+
+<script type="importmap">
+{
+  "imports": {
+    "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
+    "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/"
+  }
+}
+</script>
+
+<script type="module">
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+/* ===== SCENE ===== */
+const scene = new THREE.Scene();
+scene.background = new THREE.Color(0x1f2a1f);
+
+const camera = new THREE.PerspectiveCamera(45, innerWidth/innerHeight, 0.1, 500);
+camera.position.set(35, 25, 35);
+
+const renderer = new THREE.WebGLRenderer({ antialias:true });
+renderer.setSize(innerWidth, innerHeight);
+renderer.setPixelRatio(devicePixelRatio);
+renderer.shadowMap.enabled = true;
+document.body.appendChild(renderer.domElement);
+
+const controls = new OrbitControls(camera, renderer.domElement);
+controls.enableDamping = true;
+controls.maxPolarAngle = Math.PI/2.05;
+
+/* ===== LIGHT ===== */
+scene.add(new THREE.HemisphereLight(0xffffff, 0x334433, 1.3));
+
+const sun = new THREE.DirectionalLight(0xffffff, 1.2);
+sun.position.set(30, 50, 20);
+sun.castShadow = true;
+sun.shadow.mapSize.set(2048,2048);
+scene.add(sun);
+
+/* ===== TERRAIN ===== */
+const groundGeo = new THREE.PlaneGeometry(120,120,150,150);
+const pos = groundGeo.attributes.position;
+for(let i=0;i<pos.count;i++){
+    pos.setY(i, Math.random()*0.6);
+}
+groundGeo.computeVertexNormals();
+
+const ground = new THREE.Mesh(
+    groundGeo,
+    new THREE.MeshStandardMaterial({ color:0x3b3a2a, roughness:1 })
+);
+ground.rotation.x = -Math.PI/2;
+ground.receiveShadow = true;
+scene.add(ground);
+
+/* ===== ĐƯỜNG RỪNG ===== */
+function createPath(points, width=2){
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geo = new THREE.TubeGeometry(curve, 80, width, 12, false);
+    const mat = new THREE.MeshStandardMaterial({ color:0x6b5a3a, roughness:1 });
+    const mesh = new THREE.Mesh(geo, mat);
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+}
+
+/* ===== HÀO GIAO THÔNG ===== */
+function createTrench(points){
+    const shape = new THREE.Shape();
+    shape.moveTo(-0.7,0);
+    shape.lineTo(-0.5,-1.4);
+    shape.lineTo(0.5,-1.4);
+    shape.lineTo(0.7,0);
+
+    const curve = new THREE.CatmullRomCurve3(points);
+    const geo = new THREE.ExtrudeGeometry(shape,{
+        steps:120,
+        bevelEnabled:false,
+        extrudePath:curve
+    });
+    const mesh = new THREE.Mesh(
+        geo,
+        new THREE.MeshStandardMaterial({ color:0x2a1e16 })
+    );
+    mesh.receiveShadow = true;
+    scene.add(mesh);
+}
+
+/* ===== NHÀ LÁ 4 CỘT ===== */
+function hut(x,z){
+    const g = new THREE.Group();
+    const wood = new THREE.MeshStandardMaterial({ color:0x3a2614 });
+
+    const pos = [
+        [-2,2,-2],[2,2,-2],
+        [-2,2,2],[2,2,2]
+    ];
+pos.forEach(p=>{
+        const c = new THREE.Mesh(
+            new THREE.CylinderGeometry(0.15,0.2,4,8),
+            wood
+        );
+        c.position.set(...p);
+        c.castShadow = true;
+        g.add(c);
+    });
+
+    const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(4.2,2.5,4),
+        new THREE.MeshStandardMaterial({ color:0x5b4025, flatShading:true })
+    );
+    roof.position.y = 5;
+    roof.rotation.y = Math.PI/4;
+    roof.castShadow = true;
+    g.add(roof);
+
+    g.position.set(x,0,z);
+    scene.add(g);
+}
+
+/* ===== NHÀ HÀNH CHÍNH ===== */
+function adminHouse(x,z){
+    const g = new THREE.Group();
+    const base = new THREE.Mesh(
+        new THREE.BoxGeometry(8,3,6),
+        new THREE.MeshStandardMaterial({ color:0xf2e9dc })
+    );
+    base.position.y = 1.5;
+    base.castShadow = true;
+    g.add(base);
+
+    const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(6,2.5,4),
+        new THREE.MeshStandardMaterial({ color:0xb54a2a })
+    );
+    roof.position.y = 4.5;
+    roof.rotation.y = Math.PI/4;
+    roof.castShadow = true;
+    g.add(roof);
+
+    g.position.set(x,0,z);
+    scene.add(g);
+}
+
+/* ===== NHÀ TRƯNG BÀY ===== */
+function exhibit(x,z){
+    const g = new THREE.Group();
+    const wall = new THREE.Mesh(
+        new THREE.BoxGeometry(6,3,4),
+        new THREE.MeshStandardMaterial({ color:0x6b7b5c })
+    );
+    wall.position.y = 1.5;
+    wall.castShadow = true;
+    g.add(wall);
+
+    const roof = new THREE.Mesh(
+        new THREE.ConeGeometry(4.8,2.2,4),
+        new THREE.MeshStandardMaterial({ color:0x4b3a28, flatShading:true })
+    );
+    roof.position.y = 4.2;
+    roof.rotation.y = Math.PI/4;
+    roof.castShadow = true;
+    g.add(roof);
+
+    g.position.set(x,0,z);
+    scene.add(g);
+}
+
+/* ===== THỰC VẬT ===== */
+function plant(x,z){
+    const trunk = new THREE.Mesh(
+        new THREE.CylinderGeometry(0.2,0.3,8),
+        new THREE.MeshStandardMaterial({ color:0x3b2a1a })
+    );
+    trunk.position.set(x,4,z);
+    trunk.castShadow = true;
+    scene.add(trunk);
+
+    const leaf = new THREE.Mesh(
+        new THREE.SphereGeometry(2.5,8,8),
+        new THREE.MeshStandardMaterial({ color:0x1f3b1f })
+    );
+    leaf.position.set(x,9,z);
+    scene.add(leaf);
+}
+for(let i=0;i<120;i++){
+    plant((Math.random()-0.5)*100,(Math.random()-0.5)*100);
+}
+
+/* ===== BỐ TRÍ ===== */
+adminHouse(-25,-25);
+exhibit(25,-25);
+hut(25,25);
+createTrench([
+    new THREE.Vector3(-10,0,10),
+    new THREE.Vector3(0,0,20),
+    new THREE.Vector3(10,0,25)
+]);
+
+/* ĐƯỜNG NGÃ BA + NGÃ TƯ */
+createPath([
+    new THREE.Vector3(-25,0,-25),
+    new THREE.Vector3(0,0,-10),
+    new THREE.Vector3(25,0,-25)
+]);
+
+createPath([
+    new THREE.Vector3(0,0,-10),
+    new THREE.Vector3(0,0,10),
+    new THREE.Vector3(25,0,25)
+]);
+
+/* ===== LOOP ===== */
+function animate(){
+    requestAnimationFrame(animate);
+    controls.update();
+    renderer.render(scene,camera);
+}
+animate();
+
+addEventListener('resize',()=>{
+    camera.aspect = innerWidth/innerHeight;
+camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+});
+</script>
+</body>
+</html>
