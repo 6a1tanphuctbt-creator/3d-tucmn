@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Scan - Trung Ương Cục Miền Nam</title>
+    <style>
+        body { 
+            margin: 0; 
+            overflow: hidden; 
+            background: #000; 
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        #ui-container {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            color: rgba(255, 255, 255, 0.9);
+            background: rgba(0, 0, 0, 0.6);
+            padding: 15px 20px;
+            border-radius: 12px;
+            pointer-events: none; /* Để không block thao tác chuột trên canvas */
+            backdrop-filter: blur(4px);
+            border: 1px solid rgba(255,255,255,0.1);
+            user-select: none;
+        }
+        h1 { 
+            margin: 0 0 8px 0; 
+            font-size: 1.2rem; 
+            text-transform: uppercase; 
+            letter-spacing: 1px;
+            color: #d4af37; /* Màu vàng nhạt cho tiêu đề */
+        }
+        p { 
+            margin: 0; 
+            font-size: 0.85rem; 
+            opacity: 0.8;
+        }
+    </style>
+</head>
+<body>
+    <!-- Giao diện hiển thị thông tin -->
+    <div id="ui-container">
+        <h1>Trung Ương Cục Miền Nam</h1>
+        <p>Thao tác: Kéo chuột để xoay, Cuộn để thu phóng</p>
+    </div>
+
+    <!-- Import bản đồ Three.js -->
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+            }
+        }
+    </script>
+
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+
+        // Đảm bảo DOM và tài nguyên tải xong trước khi khởi tạo 3D
+        window.onload = function() {
+            init3DScene();
+        };
+
+        function init3DScene() {
+            // --- CÀI ĐẶT HỆ THỐNG ---
+            const scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x202020); // Nền xám nhẹ
+            scene.fog = new THREE.FogExp2(0x202020, 0.02); // Thêm sương mù tạo chiều sâu
+
+            const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 1000);
+            camera.position.set(15, 12, 20);
+
+            const renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2)); // Tối ưu hiệu suất
+            renderer.shadowMap.enabled = true;
+            renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+
+            // Tăng sáng tổng thể
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.8;
+
+            document.body.appendChild(renderer.domElement);
+
+            const controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.maxPolarAngle = Math.PI / 2 - 0.05; // Không cho camera nhìn từ dưới mặt đất lên
+
+            // --- ÁNH SÁNG PHỨC HỢP ---
+            const hemiLight = new THREE.HemisphereLight(0xffffff, 0x444444, 1.2);
+            scene.add(hemiLight);
+
+            const spotLight = new THREE.SpotLight(0xffffff, 2000);
+            spotLight.position.set(15, 25, 10);
+            spotLight.castShadow = true;
+            spotLight.shadow.mapSize.width = 2048; // Giảm xuống 2048 để tối ưu hơn so với 4096 mà vẫn sắc nét
+            spotLight.shadow.mapSize.height = 2048;
+            spotLight.shadow.bias = -0.0001;
+            scene.add(spotLight);
+
+            // --- TẠO MẶT ĐẤT GỒ GHỀ (TERRAIN) ---
+            const groundGeo = new THREE.PlaneGeometry(60, 60, 100, 100);
+            const posAttr = groundGeo.attributes.position;
+            for (let i = 0; i < posAttr.count; i++) {
+                // Tạo độ gồ ghề ngẫu nhiên cho mặt đất
+                const y = Math.random() * 0.3;
+                posAttr.setY(i, y);
+            }
+            groundGeo.computeVertexNormals();
+
+            const groundMat = new THREE.MeshStandardMaterial({ 
+                color: 0x3d3326, 
+                roughness: 1,
+                flatShading: false 
+            });
+
+            const ground = new THREE.Mesh(groundGeo, groundMat);
+            ground.rotation.x = -Math.PI / 2;
+            ground.receiveShadow = true;
+            scene.add(ground);
+
+            // --- HỆ THỐNG HÀO GIAO THÔNG ---
+            function createRealisticTrench(points) {
+                const shape = new THREE.Shape();
+                shape.moveTo(-0.8, 0);
+                shape.lineTo(-0.6, -1.2);
+                shape.lineTo(0.6, -1.2);
+                shape.lineTo(0.8, 0);
+                
+                const path = new THREE.CatmullRomCurve3(points);
+                const extrudeSettings = { steps: 100, bevelEnabled: false, extrudePath: path };
+                const geo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+                const mat = new THREE.MeshStandardMaterial({ color: 0x221a15 });
+                const mesh = new THREE.Mesh(geo, mat);
+                mesh.receiveShadow = true;
+                scene.add(mesh);
+            }
+
+            createRealisticTrench([
+                new THREE.Vector3(-10, 0, 8),
+                new THREE.Vector3(0, 0, 10),
+                new THREE.Vector3(10, 0, 8)
+            ]);
+
+            // --- NHÀ LÁ ---
+            function createHiResHouse(x, z) {
+                const group = new THREE.Group();
+                const woodMat = new THREE.MeshStandardMaterial({ color: 0x2a1b0e, roughness: 0.8 });
+                
+                // Cột nhà
+                for(let i = -1; i <= 1; i += 2) {
+                    for(let j = -1; j <= 1; j += 2) {
+                        const col = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.1, 4, 8), woodMat);
+                        col.position.set(i * 2.5, 2, j * 1.8);
+                        col.castShadow = true;
+                        col.receiveShadow = true;
+                        group.add(col);
+                    }
+                }
+
+                // Mái lá
+                const roofMat = new THREE.MeshStandardMaterial({ color: 0x4a3728, roughness: 1, flatShading: true });
+                
+                const lowerRoof = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 4.5, 1.8, 4), roofMat);
+                lowerRoof.position.y = 4;
+                lowerRoof.rotation.y = Math.PI / 4;
+                lowerRoof.castShadow = true;
+                group.add(lowerRoof);
+
+                const upperRoof = new THREE.Mesh(new THREE.CylinderGeometry(0, 2.5, 1.2, 4), roofMat);
+                upperRoof.position.y = 5.2;
+                upperRoof.rotation.y = Math.PI / 4;
+                upperRoof.castShadow = true;
+                group.add(upperRoof);
+
+                // Bàn làm việc
+                const table = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.1, 0.8), woodMat);
+                table.position.y = 0.8;
+                table.castShadow = true;
+                group.add(table);
+
+                group.position.set(x, 0, z);
+                scene.add(group);
+            }
+
+            createHiResHouse(0, 0);
+
+            // --- HỆ THỰC VẬT ---
+            const trunkMat = new THREE.MeshStandardMaterial({ color: 0x3d2b1f });
+
+            function addPlant(x, z) {
+                const type = Math.random();
+                if (type > 0.4) {
+                    // Cây thân gỗ cao
+                    const height = 12 + Math.random() * 5;
+                    const trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.2, height), trunkMat);
+                    trunk.position.set(x, height / 2, z);
+                    trunk.castShadow = true;
+                    scene.add(trunk);
+                    
+                    const foliage = new THREE.Mesh(
+                        new THREE.SphereGeometry(2 + Math.random(), 6, 6),
+                        new THREE.MeshStandardMaterial({ color: 0x1a2e1a, flatShading: true })
+                    );
+                    foliage.position.set(x, height + 1, z);
+                    foliage.castShadow = true;
+                    scene.add(foliage);
+                } else {
+                    // Bụi cây thấp
+                    const bush = new THREE.Mesh(
+                        new THREE.DodecahedronGeometry(0.5 + Math.random()),
+                        new THREE.MeshStandardMaterial({ color: 0x2d3a22, flatShading: true })
+                    );
+                    bush.position.set(x, 0.5, z);
+                    bush.castShadow = true;
+                    scene.add(bush);
+                }
+            }
+
+            // Tạo cây ngẫu nhiên xung quanh khu vực chính
+            for(let i = 0; i < 80; i++) {
+                let rx = (Math.random() - 0.5) * 50;
+                let rz = (Math.random() - 0.5) * 50;
+                // Tránh tạo cây đâm xuyên qua ngôi nhà ở giữa (bán kính 6)
+                if(Math.sqrt(rx * rx + rz * rz) > 6) {
+                    addPlant(rx, rz);
+                }
+            }
+
+            // --- ANIMATION & RESIZE ---
+            function animate() {
+                requestAnimationFrame(animate);
+                controls.update(); // Cần thiết vì có sử dụng enableDamping
+                renderer.render(scene, camera);
+            }
+            
+            animate();
+
+            // Lắng nghe sự kiện thay đổi kích thước cửa sổ
+            window.addEventListener('resize', () => {
+                camera.aspect = window.innerWidth / window.innerHeight;
+                camera.updateProjectionMatrix();
+                renderer.setSize(window.innerWidth, window.innerHeight);
+            });
+        }
+    </script>
+</body>
+</html>
